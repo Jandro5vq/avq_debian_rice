@@ -53,8 +53,10 @@ ensure_download_tool() {
     attempted="true"
   fi
 
-  if ! command_exists curl && ! command_exists wget && [[ "${attempted}" != "true" ]]; then
-    log_warn "No hay herramientas curl/wget en repos; se utilizara Python para descargas."
+  if ! command_exists curl && ! command_exists wget; then
+    if [[ "${attempted}" != "true" ]]; then
+      log_warn "No hay herramientas curl/wget en repos; se utilizara Python para descargas."
+    fi
   fi
 }
 
@@ -441,3 +443,4 @@ run_as_user() {
     runuser -u "${user}" -- "$@"
   fi
 }
+
