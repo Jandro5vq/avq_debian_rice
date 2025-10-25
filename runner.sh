@@ -23,6 +23,22 @@ STEP_SEQ=0
 STEP_LABEL=""
 STEP_START_TS=0
 
+ensure_executable() {
+  local target="$1"
+  if [[ ! -e "${target}" ]]; then
+    log_error "No se encontro el archivo requerido: ${target}"
+    exit 1
+  fi
+  if [[ ! -x "${target}" ]]; then
+    if chmod +x "${target}"; then
+      log_info "Aplicando permisos de ejecucion a ${target}"
+    else
+      log_error "No se pudieron ajustar los permisos de ${target}"
+      exit 1
+    fi
+  fi
+}
+
 format_duration() {
   local seconds="$1"
   if ((seconds < 60)); then
@@ -198,6 +214,7 @@ CONFIG_PATH="${REPO_ROOT}/config/base.yml"
 SCHEMA_PATH="${REPO_ROOT}/schemas/config.schema.json"
 MERGED_CONFIG_PATH="$(mktemp "${REPO_ROOT}/config_validated_XXXXXX.json")"
 
+ensure_executable "${REPO_ROOT}/scripts/validate_config.sh"
 VALIDATE_CMD=("${REPO_ROOT}/scripts/validate_config.sh" --config "${CONFIG_PATH}" --schema "${SCHEMA_PATH}" --output "${MERGED_CONFIG_PATH}")
 if [[ -n "${PROFILE_OVERRIDE}" ]]; then
   VALIDATE_CMD+=(--profile "${PROFILE_OVERRIDE}")
@@ -210,15 +227,16 @@ fi
 STEP_SEQ=0
 
 step_start "Validando configuracion declarativa"
-VALIDATE_OUTPUT="$("${VALIDATE_CMD[@]}" 2>&1)"
-VALIDATE_STATUS=$?
-printf '%s\n' "${VALIDATE_OUTPUT}"
-if ((VALIDATE_STATUS != 0)); then
-  step_fail "${VALIDATE_STATUS}"
-  exit "${VALIDATE_STATUS}"
+VALIDATE_STDOUT="$(mktemp "${REPO_ROOT}/validate_stdout_XXXXXX")"
+if "${VALIDATE_CMD[@]}" | tee "${VALIDATE_STDOUT}"; then
+  MERGED_CONFIG_PATH="$(tail -n1 "${VALIDATE_STDOUT}" | tr -d '\r')"
+else
+  status=$?
+  step_fail "${status}"
+  rm -f "${VALIDATE_STDOUT}"
+  exit "${status}"
 fi
-
-MERGED_CONFIG_PATH="$(printf '%s\n' "${VALIDATE_OUTPUT}" | tail -n1 | tr -d '\r')"
+rm -f "${VALIDATE_STDOUT}"
 if [[ -z "${MERGED_CONFIG_PATH}" || ! -f "${MERGED_CONFIG_PATH}" ]]; then
   step_fail 1
   log_error "No se pudo generar la configuracion validada."
@@ -282,6 +300,9 @@ if ((${#FINAL_MODULES[@]} == 0)); then
   step_done
   exit 0
 fi
+for module in "${FINAL_MODULES[@]}"; do
+  ensure_executable "${REPO_ROOT}/modules/${module}/module.sh"
+done
 log_info "Modulos a ejecutar: ${FINAL_MODULES[*]}"
 step_done
 
