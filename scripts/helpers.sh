@@ -356,6 +356,47 @@ json.dump(current, sys.stdout)
 PY
 }
 
+config_get_value() {
+  local json_path="$1"
+  local query="$2"
+  local default_value="${3:-__CONFIG_VALUE_NOT_SET__}"
+
+  python3 - "${json_path}" "${query}" "${default_value}" <<'PY'
+import json
+import sys
+
+config_path = sys.argv[1]
+query = sys.argv[2]
+default_raw = sys.argv[3]
+if default_raw == "__CONFIG_VALUE_NOT_SET__":
+    default_value = None
+else:
+    default_value = default_raw
+
+with open(config_path, encoding="utf-8") as fh:
+    data = json.load(fh)
+
+current = data
+if query:
+    for part in query.split('.'):
+        if isinstance(current, dict) and part in current:
+            current = current[part]
+        else:
+            current = None
+            break
+
+if current is None:
+    current = default_value
+
+if isinstance(current, (dict, list)):
+    json.dump(current, sys.stdout)
+else:
+    if current is None:
+        sys.stdout.write("")
+    else:
+        sys.stdout.write(str(current))
+PY
+}
 config_get_bool() {
   local json_path="$1"
   local query="$2"
@@ -445,6 +486,7 @@ run_as_user() {
     runuser -u "${user}" -- "$@"
   fi
 }
+
 
 
 
