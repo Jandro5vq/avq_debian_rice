@@ -3,24 +3,20 @@
 set -euo pipefail
 
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
-  printf '[ERROR] Este script solo debe ser utilizado mediante "source".
-' >&2
+  printf '[ERROR] Este script solo debe ser utilizado mediante "source".\n' >&2
   exit 1
 fi
 
 log_info() {
-  printf '[INFO] %s
-' "$*"
+  printf '[INFO] %s\n' "$*"
 }
 
 log_warn() {
-  printf '[WARN] %s
-' "$*"
+  printf '[WARN] %s\n' "$*"
 }
 
 log_error() {
-  printf '[ERROR] %s
-' "$*" >&2
+  printf '[ERROR] %s\n' "$*" >&2
 }
 
 require_root() {
@@ -37,8 +33,8 @@ command_exists() {
 apt_candidate_exists() {
   local pkg="$1"
   local candidate
-  candidate=$(apt-cache policy "${pkg}" 2>/dev/null | awk '/Candidate:/ {print $2}')
-  [[ -n "${candidate}" && "${candidate}" != "(none)" ]]
+  candidate=$(apt-cache policy "$pkg" 2>/dev/null | awk '/Candidate:/ {print $2}')
+  [[ -n "$candidate" && "$candidate" != "(none)" ]]
 }
 
 ensure_download_tool() {
@@ -57,10 +53,8 @@ ensure_download_tool() {
     attempted="true"
   fi
 
-  if ! command_exists curl && ! command_exists wget; then
-    if [ "${attempted}" != "true" ]; then
-      log_warn "No hay herramientas curl/wget en repos; se utilizara Python para descargas."
-    fi
+  if ! command_exists curl && ! command_exists wget && [ "$attempted" != "true" ]; then
+    log_warn "No hay herramientas curl/wget en repos; se utilizara Python para descargas."
   fi
 }
 
@@ -75,7 +69,7 @@ run_cmd() {
   fi
 
   log_info "${description}: ${cmd[*]}"
-  if ! env "${cmd[@]}"; then
+  if ! "${cmd[@]}"; then
     log_error "Fallo al ejecutar el comando anterior."
     return 1
   fi
@@ -93,12 +87,12 @@ ensure_apt_packages() {
   local pkg
 
   for pkg in "$@"; do
-    if dpkg -s "${pkg}" >/dev/null 2>&1; then
+    if dpkg -s "$pkg" >/dev/null 2>&1; then
       log_info "El paquete ${pkg} ya esta instalado."
-    elif ! apt_candidate_exists "${pkg}"; then
+    elif ! apt_candidate_exists "$pkg"; then
       log_warn "El paquete ${pkg} no tiene candidato disponible; se omitira."
     else
-      packages_to_install+=("${pkg}")
+      packages_to_install+=("$pkg")
     fi
   done
 
@@ -116,50 +110,36 @@ ensure_apt_packages() {
   DEBIAN_FRONTEND=noninteractive apt-get install -y "${packages_to_install[@]}"
 }
 
-download_deb_if_needed() {
+download_file() {
   local url="$1"
   local dest="$2"
-  local description="${3:-Paquete .deb externo}"
+  local description="${3:-recurso}"
 
-  if [[ -f "${dest}" ]]; then
-    log_info "El paquete ${description} ya fue descargado."
-    return 0
-  fi
-
-  if [[ "${DRY_RUN:-false}" == "true" ]]; then
-    log_info "(dry-run) Se descargaria ${description} desde ${url}"
-    return 0
-  fi
-
-  mkdir -p "$(dirname "${dest}")"
   ensure_download_tool
 
-  log_info "Descargando ${description} desde ${url}"
   local success="false"
 
   if command_exists curl; then
-    log_info "Descarga con curl"
-    if curl -fsSL -o "${dest}" "${url}"; then
+    log_info "Descargando ${description} con curl"
+    if curl -fsSL -o "$dest" "$url"; then
       success="true"
     else
-      log_warn "curl no pudo descargar ${description}; se intentara con wget o Python."
+      log_warn "curl no pudo descargar ${description}; se intentara otra herramienta."
     fi
   fi
 
-  if [[ "${success}" != "true" ]]; then
-    if command_exists wget; then
-      log_info "Descarga con wget"
-      if wget -qO "${dest}" "${url}"; then
-        success="true"
-      else
-        log_warn "wget no pudo descargar ${description}; se intentara con Python."
-      fi
+  if [[ "$success" != "true" && command_exists wget ]]; then
+    log_info "Descargando ${description} con wget"
+    if wget -qO "$dest" "$url"; then
+      success="true"
+    else
+      log_warn "wget no pudo descargar ${description}; se intentara con Python."
     fi
   fi
 
-  if [[ "${success}" != "true" ]]; then
-    log_info "Descarga con Python"
-    if ! python3 - "${dest}" "${url}" <<'PY'
+  if [[ "$success" != "true" ]]; then
+    log_info "Descargando ${description} con Python"
+    if ! python3 - "$dest" "$url" <<'PY'
 import sys
 import urllib.request
 
@@ -173,8 +153,39 @@ PY
     success="true"
   fi
 
-  if [[ "${success}" != "true" || ! -s "${dest}" ]]; then
+  if [[ "$success" != "true" || ! -s "$dest" ]]; then
     log_error "La descarga de ${description} fallo o el archivo esta vacio."
+    return 1
+  fi
+}
+
+download_deb_if_needed() {
+  local url="$1"
+  local dest="$2"
+  local description="${3:-Paquete .deb externo}"
+
+  if [[ -f "$dest" ]]; then
+    if dpkg-deb --info "$dest" >/dev/null 2>&1; then
+      log_info "El paquete ${description} ya fue descargado."
+      return 0
+    fi
+    log_warn "El paquete ${description} existente parece corrupto; se volvera a descargar."
+    rm -f "$dest"
+  fi
+
+  if [[ "${DRY_RUN:-false}" == "true" ]]; then
+    log_info "(dry-run) Se descargaria ${description} desde ${url}"
+    return 0
+  fi
+
+  mkdir -p "$(dirname "$dest")"
+  if ! download_file "$url" "$dest" "$description"; then
+    return 1
+  fi
+
+  if [[ ! -s "$dest" || ! dpkg-deb --info "$dest" >/dev/null 2>&1 ]]; then
+    log_error "La descarga de ${description} no produjo un .deb valido."
+    rm -f "$dest"
     return 1
   fi
 }
@@ -183,7 +194,7 @@ install_deb_package() {
   local deb_path="$1"
   local package_name="$2"
 
-  if dpkg -s "${package_name}" >/dev/null 2>&1; then
+  if dpkg -s "$package_name" >/dev/null 2>&1; then
     log_info "El paquete ${package_name} ya esta instalado."
     return 0
   fi
@@ -193,45 +204,54 @@ install_deb_package() {
     return 0
   fi
 
-  if run_cmd "Instalando ${package_name} con dpkg" dpkg -i "${deb_path}"; then
+  if run_cmd "Instalando ${package_name} con dpkg" dpkg -i "$deb_path"; then
     run_cmd "Revisando dependencias tras instalacion" apt-get install -f -y
-  else
-    log_warn "dpkg reporto problemas al instalar ${package_name}; se intentara corregir dependencias"
-    run_cmd "Corrigiendo dependencias para ${package_name}" apt-get install -f -y
-    run_cmd "Reintentando instalacion de ${package_name}" dpkg -i "${deb_path}"
+    return 0
   fi
+
+  log_warn "dpkg reporto problemas al instalar ${package_name}; se intentara corregir dependencias"
+  run_cmd "Corrigiendo dependencias para ${package_name}" apt-get install -f -y || return 1
+  if run_cmd "Reintentando instalacion de ${package_name}" dpkg -i "$deb_path"; then
+    run_cmd "Revisando dependencias tras instalacion" apt-get install -f -y
+    return 0
+  fi
+
+  log_error "No se pudo instalar ${package_name}"
+  return 1
 }
 
-# ...
 ensure_apt_repository() {
   local repo_file="$1"
   local repo_definition="$2"
   local keyring_url="$3"
   local keyring_path="$4"
 
-  if [[ -f "${repo_file}" ]]; then
+  if [[ -f "$repo_file" ]]; then
     log_info "El repositorio ${repo_file} ya existe."
   else
     if [[ "${DRY_RUN:-false}" == "true" ]]; then
       log_info "(dry-run) Se crearia el repositorio ${repo_file}"
     else
       log_info "Creando repositorio en ${repo_file}"
-      printf '%s
-' "${repo_definition}" >"${repo_file}"
+      printf '%s\n' "$repo_definition" >"$repo_file"
     fi
   fi
 
-  if [[ -n "${keyring_url}" ]]; then
-    if [[ -f "${keyring_path}" ]]; then
+  if [[ -n "$keyring_url" ]]; then
+    if [[ -f "$keyring_path" ]]; then
       log_info "El keyring ${keyring_path} ya existe."
     else
       if [[ "${DRY_RUN:-false}" == "true" ]]; then
         log_info "(dry-run) Se descargaria keyring desde ${keyring_url}"
       else
         log_info "Descargando keyring para repositorio personalizado."
-        ensure_download_tool
-        download_deb_if_needed "${keyring_url}" "${keyring_path}" "keyring"
-        chmod 644 "${keyring_path}"
+        mkdir -p "$(dirname "$keyring_path")"
+        if download_file "$keyring_url" "$keyring_path" "keyring"; then
+          chmod 644 "$keyring_path"
+        else
+          log_error "No se pudo descargar el keyring requerido."
+          return 1
+        fi
       fi
     fi
   fi
@@ -241,25 +261,25 @@ ensure_flatpak_remote() {
   local name="$1"
   local url="$2"
 
-  if flatpak remote-info "${name}" >/dev/null 2>&1; then
+  if flatpak remote-info "$name" >/dev/null 2>&1; then
     log_info "El remoto Flatpak ${name} ya existe."
     return 0
   fi
 
   if [[ "${DRY_RUN:-false}" == "true" ]]; then
-    log_info "(dry-run) Se añadiria remoto Flatpak ${name} desde ${url}"
+    log_info "(dry-run) Se Anadiria remoto Flatpak ${name} desde ${url}"
     return 0
   fi
 
-  log_info "Añadiendo remoto Flatpak ${name}"
-  flatpak remote-add --if-not-exists "${name}" "${url}"
+  log_info "Anadiendo remoto Flatpak ${name}"
+  flatpak remote-add --if-not-exists "$name" "$url"
 }
 
 ensure_symlink() {
   local source="$1"
   local target="$2"
 
-  if [[ -L "${target}" && "$(readlink -f "${target}")" == "$(readlink -f "${source}")" ]]; then
+  if [[ -L "$target" && "$(readlink -f "$target")" == "$(readlink -f "$source")" ]]; then
     log_info "El enlace simbolico ${target} ya apunta a ${source}."
     return 0
   fi
@@ -270,19 +290,19 @@ ensure_symlink() {
   fi
 
   log_info "Creando enlace simbolico ${target} -> ${source}"
-  mkdir -p "$(dirname "${target}")"
-  ln -sf "${source}" "${target}"
+  mkdir -p "$(dirname "$target")"
+  ln -sf "$source" "$target"
 }
 
 copy_if_different() {
   local source="$1"
   local target="$2"
 
-  if [[ -f "${target}" ]]; then
+  if [[ -f "$target" ]]; then
     local source_hash target_hash
-    source_hash=$(sha256sum "${source}" | awk '{print $1}')
-    target_hash=$(sha256sum "${target}" | awk '{print $1}')
-    if [[ "${source_hash}" == "${target_hash}" ]]; then
+    source_hash=$(sha256sum "$source" | awk '{print $1}')
+    target_hash=$(sha256sum "$target" | awk '{print $1}')
+    if [[ "$source_hash" == "$target_hash" ]]; then
       log_info "El archivo de destino ${target} ya coincide con el origen."
       return 0
     fi
@@ -294,14 +314,14 @@ copy_if_different() {
   fi
 
   log_info "Copiando ${source} a ${target}"
-  mkdir -p "$(dirname "${target}")"
-  cp -f "${source}" "${target}"
+  mkdir -p "$(dirname "$target")"
+  cp -f "$source" "$target"
 }
 
 ensure_flatpak_app() {
   local app_id="$1"
 
-  if flatpak info "${app_id}" >/dev/null 2>&1; then
+  if flatpak info "$app_id" >/dev/null 2>&1; then
     log_info "El Flatpak ${app_id} ya esta instalado."
     return 0
   fi
@@ -312,39 +332,38 @@ ensure_flatpak_app() {
   fi
 
   log_info "Instalando Flatpak ${app_id}"
-  flatpak install -y "${app_id}"
+  flatpak install -y "$app_id"
 }
 
 ensure_config_line() {
   local file_path="$1"
   local line="$2"
 
-  if [[ -f "${file_path}" ]] && grep -Fxq "${line}" "${file_path}"; then
+  if [[ -f "$file_path" ]] && grep -Fxq "$line" "$file_path"; then
     log_info "La linea requerida ya existe en ${file_path}"
     return 0
   fi
 
   if [[ "${DRY_RUN:-false}" == "true" ]]; then
-    log_info "(dry-run) Se añadiria linea en ${file_path}: ${line}"
+    log_info "(dry-run) Se Anadiria linea en ${file_path}: ${line}"
     return 0
   fi
 
-  log_info "Añadiendo linea a ${file_path}"
-  mkdir -p "$(dirname "${file_path}")"
-  printf '%s
-' "${line}" >>"${file_path}"
+  log_info "Anadiendo linea a ${file_path}"
+  mkdir -p "$(dirname "$file_path")"
+  printf '%s\n' "$line" >>"$file_path"
 }
 
 json_query() {
   local json_path="$1"
   local query="$2"
 
-  if [[ ! -f "${json_path}" ]]; then
+  if [[ ! -f "$json_path" ]]; then
     log_error "Archivo de configuracion ${json_path} no disponible."
     return 1
   fi
 
-  python3 - "${json_path}" "${query}" <<'PY'
+  python3 - "$json_path" "$query" <<'PY'
 import json
 import sys
 
@@ -367,53 +386,12 @@ json.dump(current, sys.stdout)
 PY
 }
 
-config_get_value() {
-  local json_path="$1"
-  local query="$2"
-  local default_value="${3:-__CONFIG_VALUE_NOT_SET__}"
-
-  python3 - "${json_path}" "${query}" "${default_value}" <<'PY'
-import json
-import sys
-
-config_path = sys.argv[1]
-query = sys.argv[2]
-default_raw = sys.argv[3]
-if default_raw == "__CONFIG_VALUE_NOT_SET__":
-    default_value = None
-else:
-    default_value = default_raw
-
-with open(config_path, encoding="utf-8") as fh:
-    data = json.load(fh)
-
-current = data
-if query:
-    for part in query.split('.'):
-        if isinstance(current, dict) and part in current:
-            current = current[part]
-        else:
-            current = None
-            break
-
-if current is None:
-    current = default_value
-
-if isinstance(current, (dict, list)):
-    json.dump(current, sys.stdout)
-else:
-    if current is None:
-        sys.stdout.write("")
-    else:
-        sys.stdout.write(str(current))
-PY
-}
 config_get_bool() {
   local json_path="$1"
   local query="$2"
   local default="${3:-false}"
 
-  python3 - "${json_path}" "${query}" "${default}" <<'PY'
+  python3 - "$json_path" "$query" "$default" <<'PY'
 import json
 import sys
 
@@ -453,7 +431,7 @@ config_get_list() {
   local json_path="$1"
   local query="$2"
 
-  python3 - "${json_path}" "${query}" <<'PY'
+  python3 - "$json_path" "$query" <<'PY'
 import json
 import sys
 
@@ -475,11 +453,52 @@ if query:
 if isinstance(current, list):
     for item in current:
         if isinstance(item, (dict, list)):
-            sys.stdout.write(json.dumps(item))
+            print(json.dumps(item))
         else:
-            sys.stdout.write(str(item))
-        sys.stdout.write("
-")
+            print(item)
+PY
+}
+
+config_get_value() {
+  local json_path="$1"
+  local query="$2"
+  local default_value="${3:-__CONFIG_VALUE_NOT_SET__}"
+
+  python3 - "$json_path" "$query" "$default_value" <<'PY'
+import json
+import sys
+
+config_path = sys.argv[1]
+query = sys.argv[2]
+default_raw = sys.argv[3]
+
+if default_raw == "__CONFIG_VALUE_NOT_SET__":
+    default_value = None
+else:
+    default_value = default_raw
+
+with open(config_path, encoding="utf-8") as fh:
+    data = json.load(fh)
+
+current = data
+if query:
+    for part in query.split('.'):
+        if isinstance(current, dict):
+            current = current.get(part)
+        else:
+            current = None
+            break
+
+if current is None:
+    current = default_value
+
+if isinstance(current, (dict, list)):
+    json.dump(current, sys.stdout)
+else:
+    if current is None:
+        sys.stdout.write("")
+    else:
+        sys.stdout.write(str(current))
 PY
 }
 
@@ -492,19 +511,9 @@ run_as_user() {
     return 0
   fi
 
-  if [[ "${user}" == "root" ]]; then
+  if [[ "$user" == "root" ]]; then
     "$@"
   else
-    runuser -u "${user}" -- "$@"
+    runuser -u "$user" -- "$@"
   fi
 }
-
-
-
-
-
-
-
-
-
-
