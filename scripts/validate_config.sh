@@ -68,6 +68,33 @@ fi
 
 ensure_apt_packages python3 python3-yaml python3-jsonschema
 
+ensure_python_modules() {
+  local -a missing_modules=()
+  local module package
+  for mapping in "yaml:PyYAML" "jsonschema:jsonschema"; do
+    module="${mapping%%:*}"
+    package="${mapping##*:}"
+    if ! python3 -c "import ${module}" >/dev/null 2>&1; then
+      missing_modules+=("${package}")
+    fi
+  done
+
+  if ((${#missing_modules[@]} == 0)); then
+    return
+  fi
+
+  ensure_apt_packages python3-pip
+  if ! command_exists pip3; then
+    run_cmd "Instalando pip mediante ensurepip" python3 -m ensurepip --upgrade
+  fi
+
+  for package in "${missing_modules[@]}"; do
+    run_cmd "Instalando modulo Python ${package}" python3 -m pip install --upgrade "${package}"
+  done
+}
+
+ensure_python_modules
+
 if [[ -z "${OUTPUT_PATH}" ]]; then
   OUTPUT_PATH="$(mktemp "${ROOT_DIR}/config_validated_XXXXXX.json")"
 fi
