@@ -69,7 +69,7 @@ run_cmd() {
   fi
 
   log_info "${description}: ${cmd[*]}"
-  if ! "${cmd[@]}"; then
+  if ! env "${cmd[@]}"; then
     log_error "Fallo al ejecutar el comando anterior."
     return 1
   fi
@@ -525,6 +525,8 @@ run_as_user() {
     runuser -u "$user" -- "$@"
   fi
 }
+
+
 
 
 
