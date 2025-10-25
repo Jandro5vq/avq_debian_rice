@@ -92,6 +92,9 @@ ensure_python_modules() {
   if ! command_exists pip3; then
     local get_pip_script
     get_pip_script="$(mktemp)"
+    if ! command_exists curl; then
+      ensure_apt_packages curl ca-certificates
+    fi
     run_cmd "Descargando instalador get-pip" curl -fsSL -o "${get_pip_script}" https://bootstrap.pypa.io/get-pip.py
     run_cmd "Instalando pip mediante get-pip" python3 "${get_pip_script}" --disable-pip-version-check
     rm -f "${get_pip_script}"
