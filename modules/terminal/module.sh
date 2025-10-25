@@ -94,7 +94,7 @@ install_tabby() {
     return
   fi
 
-  run_cmd "Instalando Tabby" apt-get install -y "${deb_path}"
+  install_deb_package "${deb_path}" "tabby"
 }
 
 install_kitty() {
@@ -197,3 +197,4 @@ main() {
 }
 
 main "$@"
+
