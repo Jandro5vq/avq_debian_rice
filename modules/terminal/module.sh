@@ -87,14 +87,20 @@ install_tabby() {
   work_dir="$(get_workdir)"
   local deb_path="${work_dir}/tabby-${arch_label}-${version_tag}.deb"
 
-  download_deb_if_needed "${download_url}" "${deb_path}" "Tabby"
+  if ! download_deb_if_needed "${download_url}" "${deb_path}" "Tabby"; then
+    log_warn "No se pudo descargar Tabby desde ${download_url}; se omitira."
+    return
+  fi
 
   if [[ "${DRY_RUN}" == "true" ]]; then
     log_info "(dry-run) Se instalaria Tabby desde ${deb_path}"
     return
   fi
 
-  install_deb_package "${deb_path}" "tabby"
+  if ! install_deb_package "${deb_path}" "tabby"; then
+    log_warn "No se pudo instalar Tabby; se omitira."
+    return
+  fi
 }
 
 install_kitty() {

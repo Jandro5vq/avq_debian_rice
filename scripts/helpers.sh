@@ -185,7 +185,17 @@ download_deb_if_needed() {
     return 1
   fi
 
-  if [[ ! -s "$dest" || ! dpkg-deb --info "$dest" >/dev/null 2>&1 ]]; then
+  if [[ ! -s "$dest" ]]; then
+    log_error "La descarga de ${description} quedo vacia."
+    rm -f "$dest"
+    return 1
+  fi
+
+  if ! dpkg-deb --info "$dest" >/dev/null 2>&1; then
+    log_error "La descarga de ${description} no produjo un .deb valido."
+    rm -f "$dest"
+    return 1
+  fi
     log_error "La descarga de ${description} no produjo un .deb valido."
     rm -f "$dest"
     return 1
@@ -519,5 +529,6 @@ run_as_user() {
     runuser -u "$user" -- "$@"
   fi
 }
+
 
 
