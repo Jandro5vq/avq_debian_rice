@@ -54,7 +54,7 @@ ensure_download_tool() {
   fi
 
   if ! command_exists curl && ! command_exists wget; then
-    if [[ "${attempted}" != "true" ]]; then
+    if [ "${attempted}" != "true" ]; then
       log_warn "No hay herramientas curl/wget en repos; se utilizara Python para descargas."
     fi
   fi
