@@ -3,20 +3,24 @@
 set -euo pipefail
 
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
-  printf '[ERROR] Este script solo debe ser utilizado mediante "source".\n' >&2
+  printf '[ERROR] Este script solo debe ser utilizado mediante "source".
+' >&2
   exit 1
 fi
 
 log_info() {
-  printf '[INFO] %s\n' "$*"
+  printf '[INFO] %s
+' "$*"
 }
 
 log_warn() {
-  printf '[WARN] %s\n' "$*"
+  printf '[WARN] %s
+' "$*"
 }
 
 log_error() {
-  printf '[ERROR] %s\n' "$*" >&2
+  printf '[ERROR] %s
+' "$*" >&2
 }
 
 require_root() {
@@ -189,8 +193,13 @@ install_deb_package() {
     return 0
   fi
 
-  log_info "Instalando ${package_name} desde ${deb_path}"
-  apt-get install -y "${deb_path}"
+  if run_cmd "Instalando ${package_name} con dpkg" dpkg -i "${deb_path}"; then
+    run_cmd "Revisando dependencias tras instalacion" apt-get install -f -y
+  else
+    log_warn "dpkg reporto problemas al instalar ${package_name}; se intentara corregir dependencias"
+    run_cmd "Corrigiendo dependencias para ${package_name}" apt-get install -f -y
+    run_cmd "Reintentando instalacion de ${package_name}" dpkg -i "${deb_path}"
+  fi
 }
 
 # ...
@@ -207,7 +216,8 @@ ensure_apt_repository() {
       log_info "(dry-run) Se crearia el repositorio ${repo_file}"
     else
       log_info "Creando repositorio en ${repo_file}"
-      printf '%s\n' "${repo_definition}" >"${repo_file}"
+      printf '%s
+' "${repo_definition}" >"${repo_file}"
     fi
   fi
 
@@ -321,7 +331,8 @@ ensure_config_line() {
 
   log_info "Añadiendo linea a ${file_path}"
   mkdir -p "$(dirname "${file_path}")"
-  printf '%s\n' "${line}" >>"${file_path}"
+  printf '%s
+' "${line}" >>"${file_path}"
 }
 
 json_query() {
@@ -467,7 +478,8 @@ if isinstance(current, list):
             sys.stdout.write(json.dumps(item))
         else:
             sys.stdout.write(str(item))
-        sys.stdout.write("\n")
+        sys.stdout.write("
+")
 PY
 }
 
@@ -486,6 +498,10 @@ run_as_user() {
     runuser -u "${user}" -- "$@"
   fi
 }
+
+
+
+
 
 
 
