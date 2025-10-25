@@ -36,6 +36,27 @@ apt_candidate_exists() {
   candidate=$(apt-cache policy "${pkg}" 2>/dev/null | awk '/Candidate:/ {print $2}')
   [[ -n "${candidate}" && "${candidate}" != "(none)" ]]
 }
+
+ensure_download_tool() {
+  if command_exists curl || command_exists wget; then
+    return
+  fi
+
+  local attempted="false"
+  if apt_candidate_exists curl; then
+    ensure_apt_packages curl ca-certificates
+    attempted="true"
+  fi
+
+  if ! command_exists curl && apt_candidate_exists wget; then
+    ensure_apt_packages wget ca-certificates
+    attempted="true"
+  fi
+
+  if ! command_exists curl && ! command_exists wget && [[ "${attempted}" != "true" ]]; then
+    log_warn "No hay herramientas curl/wget en repos; se utilizara Python para descargas."
+  fi
+}
 run_cmd() {
   local description="$1"
   shift
@@ -103,8 +124,24 @@ download_deb_if_needed() {
     return 0
   fi
 
+  mkdir -p "$(dirname "${dest}")"
+
+  ensure_download_tool
+
   log_info "Descargando ${description} desde ${url}"
-  curl -fsSL -o "${dest}" "${url}"
+  if command_exists curl; then
+    run_cmd "Descargando ${description} con curl" curl -fsSL -o "${dest}" "${url}"
+  elif command_exists wget; then
+    run_cmd "Descargando ${description} con wget" wget -qO "${dest}" "${url}"
+  else
+    run_cmd "Descargando ${description} con Python" python3 - "${dest}" "${url}" <<'PY'
+import sys
+import urllib.request
+
+dest, url = sys.argv[1:3]
+urllib.request.urlretrieve(url, dest)
+PY
+  fi
 }
 
 install_deb_package() {
