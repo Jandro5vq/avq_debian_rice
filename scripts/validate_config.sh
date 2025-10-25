@@ -68,6 +68,29 @@ fi
 
 ensure_apt_packages python3 python3-yaml python3-jsonschema
 
+download_get_pip() {
+  local dest="$1"
+  local url="$2"
+
+  if command_exists curl; then
+    run_cmd "Descargando instalador get-pip" curl -fsSL -o "${dest}" "${url}"
+    return
+  fi
+
+  if command_exists wget; then
+    run_cmd "Descargando instalador get-pip" wget -qO "${dest}" "${url}"
+    return
+  fi
+
+  run_cmd "Descargando instalador get-pip con Python" python3 - "${dest}" "${url}" <<'PY'
+import sys
+import urllib.request
+
+dest, url = sys.argv[1:3]
+urllib.request.urlretrieve(url, dest)
+PY
+}
+
 ensure_python_modules() {
   local -a missing_modules=()
   local module package
@@ -87,15 +110,18 @@ ensure_python_modules() {
     if apt_candidate_exists python3-pip; then
       ensure_apt_packages python3-pip
     fi
+    if apt_candidate_exists curl; then
+      ensure_apt_packages curl ca-certificates
+    fi
+    if apt_candidate_exists wget; then
+      ensure_apt_packages wget ca-certificates
+    fi
   fi
 
   if ! command_exists pip3; then
     local get_pip_script
     get_pip_script="$(mktemp)"
-    if ! command_exists curl; then
-      ensure_apt_packages curl ca-certificates
-    fi
-    run_cmd "Descargando instalador get-pip" curl -fsSL -o "${get_pip_script}" https://bootstrap.pypa.io/get-pip.py
+    download_get_pip "${get_pip_script}" "https://bootstrap.pypa.io/get-pip.py"
     run_cmd "Instalando pip mediante get-pip" python3 "${get_pip_script}" --disable-pip-version-check
     rm -f "${get_pip_script}"
   fi
