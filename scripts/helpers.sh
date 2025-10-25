@@ -39,14 +39,15 @@ apt_candidate_exists() {
 run_cmd() {
   local description="$1"
   shift
+  local -a cmd=("$@")
 
   if [[ "${DRY_RUN:-false}" == "true" ]]; then
-    log_info "(dry-run) ${description}: $*"
+    log_info "(dry-run) ${description}: ${cmd[*]}"
     return 0
   fi
 
-  log_info "${description}: $*"
-  if ! "$@"; then
+  log_info "${description}: ${cmd[*]}"
+  if ! env "${cmd[@]}"; then
     log_error "Fallo al ejecutar el comando anterior."
     return 1
   fi
@@ -419,5 +420,6 @@ run_as_user() {
     runuser -u "${user}" -- "$@"
   fi
 }
+
 
 
