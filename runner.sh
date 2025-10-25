@@ -146,7 +146,8 @@ if [[ ! -f "${MERGED_CONFIG_PATH}" ]]; then
   exit 1
 fi
 
-ACTIVE_PROFILE="$(python3 - "${MERGED_CONFIG_PATH}" <<'PY')"
+ACTIVE_PROFILE="$(
+python3 - "${MERGED_CONFIG_PATH}" <<'PY'
 import json
 import sys
 
@@ -155,6 +156,7 @@ with open(config_path, encoding="utf-8") as fh:
     data = json.load(fh)
 print(data.get("meta", {}).get("profile", ""))
 PY
+)"
 ACTIVE_PROFILE="${ACTIVE_PROFILE//$'\r'/}"
 ACTIVE_PROFILE="${ACTIVE_PROFILE//$'\n'/}"
 
@@ -163,7 +165,8 @@ if [[ -z "${ACTIVE_PROFILE}" ]]; then
   exit 1
 fi
 
-CONFIG_DRY_RUN="$(python3 - "${MERGED_CONFIG_PATH}" <<'PY')"
+CONFIG_DRY_RUN="$(
+python3 - "${MERGED_CONFIG_PATH}" <<'PY'
 import json
 import sys
 
@@ -172,6 +175,7 @@ with open(config_path, encoding="utf-8") as fh:
     data = json.load(fh)
 print(str(data.get("meta", {}).get("dry_run", False)).lower())
 PY
+)"
 CONFIG_DRY_RUN="${CONFIG_DRY_RUN//$'\r'/}"
 CONFIG_DRY_RUN="${CONFIG_DRY_RUN//$'\n'/}"
 

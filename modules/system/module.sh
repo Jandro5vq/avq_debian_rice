@@ -81,7 +81,22 @@ PY
 
 install_plasma_stack() {
   local install_sddm="$1"
-  local packages=("plasma-desktop" "plasma-workspace-wayland" "kde-config-gtk-style")
+
+  apt_candidate_available() {
+    local pkg="$1"
+    local candidate
+    candidate=$(apt-cache policy "${pkg}" 2>/dev/null | awk '/Candidate:/ {print $2}')
+    [[ -n "${candidate}" && "${candidate}" != "(none)" ]]
+  }
+
+  local packages=("plasma-desktop" "kde-config-gtk-style")
+
+  if apt_candidate_available "plasma-workspace-wayland"; then
+    packages+=("plasma-workspace-wayland")
+  else
+    log_warn "plasma-workspace-wayland no esta disponible; se utilizara plasma-workspace."
+    packages+=("plasma-workspace")
+  fi
 
   if [[ "${install_sddm}" == "true" ]]; then
     packages+=("sddm" "sddm-theme-debian-breeze")
@@ -152,4 +167,3 @@ main() {
 }
 
 main "$@"
-

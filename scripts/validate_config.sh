@@ -74,7 +74,8 @@ fi
 
 export CONFIG_PATH SCHEMA_PATH PROFILE_OVERRIDE OUTPUT_PATH ROOT_DIR
 
-MERGED_CONFIG_PATH="$(python3 - <<'PY')"
+MERGED_CONFIG_PATH="$(
+python3 - <<'PY'
 import json
 import os
 import sys
@@ -143,10 +144,9 @@ with output_path.open("w", encoding="utf-8") as out_fh:
 
 print(output_path)
 PY
-
+)"
 MERGED_CONFIG_PATH="${MERGED_CONFIG_PATH//$'\r'/}"
 MERGED_CONFIG_PATH="${MERGED_CONFIG_PATH//$'\n'/}"
 
 log_info "Configuracion validada correctamente: ${MERGED_CONFIG_PATH}"
 printf '%s\n' "${MERGED_CONFIG_PATH}"
-
