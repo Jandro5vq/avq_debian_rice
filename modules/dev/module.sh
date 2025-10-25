@@ -144,6 +144,36 @@ add_user_to_docker_group() {
     return
   fi
 
+  if ! command_exists docker; then
+    log_warn "Docker no esta instalado; se omite agregar al grupo."
+    return
+  fi
+
+  if ! getent group docker >/dev/null; then
+    log_warn "El grupo docker no existe; se omite agregar al usuario."
+    return
+  fi
+
+  if id -nG "${TARGET_USER}" | tr " " "\n" | grep -Fxq "docker"; then
+    log_info "El usuario ${TARGET_USER} ya pertenece al grupo docker."
+    return
+  fi
+
+  if [[ "${DRY_RUN}" == "true" ]]; then
+    log_info "(dry-run) Se agregaria ${TARGET_USER} al grupo docker."
+  else
+    run_cmd "Agregando usuario ${TARGET_USER} al grupo docker" usermod -aG docker "${TARGET_USER}"
+  fi
+}
+" != "true" ]]; then
+    return
+  fi
+
+  if [[ "${TARGET_USER}" == "root" ]]; then
+    log_warn "Se omite agregar root al grupo docker."
+    return
+  fi
+
   if id -nG "${TARGET_USER}" | tr ' ' '\n' | grep -Fxq "docker"; then
     log_info "El usuario ${TARGET_USER} ya pertenece al grupo docker."
     return
@@ -382,3 +412,6 @@ main() {
 }
 
 main "$@"
+
+
+
