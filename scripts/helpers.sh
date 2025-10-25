@@ -57,6 +57,7 @@ ensure_download_tool() {
     log_warn "No hay herramientas curl/wget en repos; se utilizara Python para descargas."
   fi
 }
+
 run_cmd() {
   local description="$1"
   shift
@@ -125,22 +126,48 @@ download_deb_if_needed() {
   fi
 
   mkdir -p "$(dirname "${dest}")"
-
   ensure_download_tool
 
   log_info "Descargando ${description} desde ${url}"
+  local success="false"
+
   if command_exists curl; then
-    run_cmd "Descargando ${description} con curl" curl -fsSL -o "${dest}" "${url}"
-  elif command_exists wget; then
-    run_cmd "Descargando ${description} con wget" wget -qO "${dest}" "${url}"
-  else
-    run_cmd "Descargando ${description} con Python" python3 - "${dest}" "${url}" <<'PY'
+    log_info "Descarga con curl"
+    if curl -fsSL -o "${dest}" "${url}"; then
+      success="true"
+    else
+      log_warn "curl no pudo descargar ${description}; se intentara con wget o Python."
+    fi
+  fi
+
+  if [[ "${success}" != "true" && command_exists wget ]]; then
+    log_info "Descarga con wget"
+    if wget -qO "${dest}" "${url}"; then
+      success="true"
+    else
+      log_warn "wget no pudo descargar ${description}; se intentara con Python."
+    fi
+  fi
+
+  if [[ "${success}" != "true" ]]; then
+    log_info "Descarga con Python"
+    if ! python3 - "${dest}" "${url}" <<'PY'
 import sys
 import urllib.request
 
 dest, url = sys.argv[1:3]
 urllib.request.urlretrieve(url, dest)
 PY
+    then
+      log_error "No se pudo descargar ${description}."
+      return 1
+    fi
+    success="true"
+  fi
+
+  if [[ "${success}" != "true" || ! -s "${dest}" ]]; then
+    log_error "La descarga de ${description} fallo o el archivo esta vacio."
+    return 1
   fi
 }
 
@@ -162,11 +189,12 @@ install_deb_package() {
   apt-get install -y "${deb_path}"
 }
 
+# ...
 ensure_apt_repository() {
   local repo_file="$1"
   local repo_definition="$2"
-  local keyring_url="${3:-}"
-  local keyring_path="${4:-}"
+  local keyring_url="$3"
+  local keyring_path="$4"
 
   if [[ -f "${repo_file}" ]]; then
     log_info "El repositorio ${repo_file} ya existe."
@@ -187,7 +215,8 @@ ensure_apt_repository() {
         log_info "(dry-run) Se descargaria keyring desde ${keyring_url}"
       else
         log_info "Descargando keyring para repositorio personalizado."
-        curl -fsSL -o "${keyring_path}" "${keyring_url}"
+        ensure_download_tool
+        download_deb_if_needed "${keyring_url}" "${keyring_path}" "keyring"
         chmod 644 "${keyring_path}"
       fi
     fi
@@ -204,11 +233,11 @@ ensure_flatpak_remote() {
   fi
 
   if [[ "${DRY_RUN:-false}" == "true" ]]; then
-    log_info "(dry-run) Se anadiria remoto Flatpak ${name} desde ${url}"
+    log_info "(dry-run) Se añadiria remoto Flatpak ${name} desde ${url}"
     return 0
   fi
 
-  log_info "Anadiendo remoto Flatpak ${name}"
+  log_info "Añadiendo remoto Flatpak ${name}"
   flatpak remote-add --if-not-exists "${name}" "${url}"
 }
 
@@ -282,11 +311,11 @@ ensure_config_line() {
   fi
 
   if [[ "${DRY_RUN:-false}" == "true" ]]; then
-    log_info "(dry-run) Se anadiria linea en ${file_path}: ${line}"
+    log_info "(dry-run) Se añadiria linea en ${file_path}: ${line}"
     return 0
   fi
 
-  log_info "Anadiendo linea a ${file_path}"
+  log_info "Añadiendo linea a ${file_path}"
   mkdir -p "$(dirname "${file_path}")"
   printf '%s\n' "${line}" >>"${file_path}"
 }
@@ -323,57 +352,12 @@ json.dump(current, sys.stdout)
 PY
 }
 
-config_get_value() {
-  local json_path="$1"
-  local query="$2"
-  local default="${3:-null}"
-
-  python3 - "$json_path" "$query" "$default" <<'PY'
-import json
-import sys
-
-config_path = sys.argv[1]
-query = sys.argv[2]
-default_raw = sys.argv[3]
-
-with open(config_path, encoding="utf-8") as fh:
-    data = json.load(fh)
-
-def parse_default(raw):
-    if raw == "null":
-        return None
-    if raw in ("true", "false"):
-        return raw == "true"
-    try:
-        return json.loads(raw)
-    except json.JSONDecodeError:
-        return raw
-
-current = data
-if query:
-    for part in query.split('.'):
-        if isinstance(current, dict):
-            current = current.get(part)
-        else:
-            current = None
-            break
-
-if current is None:
-    current = parse_default(default_raw)
-
-if isinstance(current, (dict, list)):
-    json.dump(current, sys.stdout)
-else:
-    sys.stdout.write(str(current) if current is not None else "")
-PY
-}
-
 config_get_bool() {
   local json_path="$1"
   local query="$2"
   local default="${3:-false}"
 
-  python3 - "$json_path" "$query" "$default" <<'PY'
+  python3 - "${json_path}" "${query}" "${default}" <<'PY'
 import json
 import sys
 
@@ -413,7 +397,7 @@ config_get_list() {
   local json_path="$1"
   local query="$2"
 
-  python3 - "$json_path" "$query" <<'PY'
+  python3 - "${json_path}" "${query}" <<'PY'
 import json
 import sys
 
@@ -457,6 +441,3 @@ run_as_user() {
     runuser -u "${user}" -- "$@"
   fi
 }
-
-
-
