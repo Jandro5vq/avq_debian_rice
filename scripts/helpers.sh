@@ -142,12 +142,14 @@ download_deb_if_needed() {
     fi
   fi
 
-  if [[ "${success}" != "true" && command_exists wget ]]; then
-    log_info "Descarga con wget"
-    if wget -qO "${dest}" "${url}"; then
-      success="true"
-    else
-      log_warn "wget no pudo descargar ${description}; se intentara con Python."
+  if [[ "${success}" != "true" ]]; then
+    if command_exists wget; then
+      log_info "Descarga con wget"
+      if wget -qO "${dest}" "${url}"; then
+        success="true"
+      else
+        log_warn "wget no pudo descargar ${description}; se intentara con Python."
+      fi
     fi
   fi
 
@@ -443,4 +445,6 @@ run_as_user() {
     runuser -u "${user}" -- "$@"
   fi
 }
+
+
 
