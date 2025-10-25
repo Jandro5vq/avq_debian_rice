@@ -30,6 +30,12 @@ command_exists() {
   command -v "$1" >/dev/null 2>&1
 }
 
+apt_candidate_exists() {
+  local pkg="$1"
+  local candidate
+  candidate=$(apt-cache policy "${pkg}" 2>/dev/null | awk '/Candidate:/ {print $2}')
+  [[ -n "${candidate}" && "${candidate}" != "(none)" ]]
+}
 run_cmd() {
   local description="$1"
   shift
@@ -60,6 +66,8 @@ ensure_apt_packages() {
   for pkg in "$@"; do
     if dpkg -s "${pkg}" >/dev/null 2>&1; then
       log_info "El paquete ${pkg} ya esta instalado."
+    elif ! apt_candidate_exists "${pkg}"; then
+      log_warn "El paquete ${pkg} no tiene candidato disponible; se omitira."
     else
       packages_to_install+=("${pkg}")
     fi
@@ -411,3 +419,5 @@ run_as_user() {
     runuser -u "${user}" -- "$@"
   fi
 }
+
+

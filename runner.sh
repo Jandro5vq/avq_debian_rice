@@ -18,6 +18,43 @@ declare -a SKIP_MODULES=()
 
 TARGET_USER="${SUDO_USER:-root}"
 TARGET_HOME="$(getent passwd "${TARGET_USER}" | cut -d: -f6)"
+STEP_TOTAL=0
+STEP_SEQ=0
+STEP_LABEL=""
+STEP_START_TS=0
+
+format_duration() {
+  local seconds="$1"
+  if ((seconds < 60)); then
+    printf '%ds' "${seconds}"
+  else
+    local minutes=$((seconds / 60))
+    local remainder=$((seconds % 60))
+    if ((remainder == 0)); then
+      printf '%dm' "${minutes}"
+    else
+      printf '%dm%ds' "${minutes}" "${remainder}"
+    fi
+  fi
+}
+
+step_start() {
+  STEP_SEQ=$((STEP_SEQ + 1))
+  STEP_LABEL="$1"
+  STEP_START_TS=$(date +%s)
+  printf ' => [%02d/%02d] RUN     %s\n' "${STEP_SEQ}" "${STEP_TOTAL}" "${STEP_LABEL}"
+}
+
+step_done() {
+  local elapsed=$(( $(date +%s) - STEP_START_TS ))
+  printf ' => [%02d/%02d] DONE    %s (%s)\n' "${STEP_SEQ}" "${STEP_TOTAL}" "${STEP_LABEL}" "$(format_duration "${elapsed}")"
+}
+
+step_fail() {
+  local exit_code="$1"
+  local elapsed=$(( $(date +%s) - STEP_START_TS ))
+  printf ' => [%02d/%02d] ERROR   %s (code %s, %s)\n' "${STEP_SEQ}" "${STEP_TOTAL}" "${STEP_LABEL}" "${exit_code}" "$(format_duration "${elapsed}")" >&2
+}
 
 if [[ -z "${TARGET_HOME}" ]]; then
   log_error "No se pudo determinar el directorio home para ${TARGET_USER}."
@@ -83,7 +120,6 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-# Normalizamos listas de modulos eliminando espacios y convirtiendo a minusculas.
 normalize_modules() {
   local -n ref_array=$1
   for idx in "${!ref_array[@]}"; do
@@ -119,13 +155,41 @@ validate_module_list() {
 validate_module_list ONLY_MODULES "--only"
 validate_module_list SKIP_MODULES "--skip"
 
+declare -a FINAL_MODULES=()
+for module in "${ALL_MODULES[@]}"; do
+  local_include="true"
+  if ((${#ONLY_MODULES[@]} > 0)); then
+    local_include="false"
+    for item in "${ONLY_MODULES[@]}"; do
+      if [[ "${item}" == "${module}" ]]; then
+        local_include="true"
+        break
+      fi
+    done
+  fi
+
+  if [[ "${local_include}" != "true" ]]; then
+    continue
+  fi
+
+  for item in "${SKIP_MODULES[@]}"; do
+    if [[ "${item}" == "${module}" ]]; then
+      local_include="false"
+      break
+    fi
+  done
+
+  if [[ "${local_include}" == "true" ]]; then
+    FINAL_MODULES+=("${module}")
+  fi
+done
+
 LOG_DIR="/var/log/debian-plasma-rice"
 mkdir -p "${LOG_DIR}"
 LOG_FILE="${LOG_DIR}/runner-$(date +%Y%m%d-%H%M%S).log"
 touch "${LOG_FILE}"
 chmod 640 "${LOG_FILE}"
 
-# Reflejamos la salida tanto por pantalla como por archivo.
 exec > >(tee -a "${LOG_FILE}") 2>&1
 
 log_info "Iniciando debian-plasma-rice en $(hostname)"
@@ -139,12 +203,28 @@ if [[ -n "${PROFILE_OVERRIDE}" ]]; then
   VALIDATE_CMD+=(--profile "${PROFILE_OVERRIDE}")
 fi
 
-"${VALIDATE_CMD[@]}"
+STEP_TOTAL=$(( ${#FINAL_MODULES[@]} + 3 ))
+if ((STEP_TOTAL < 3)); then
+  STEP_TOTAL=3
+fi
+STEP_SEQ=0
 
-if [[ ! -f "${MERGED_CONFIG_PATH}" ]]; then
+step_start "Validando configuracion declarativa"
+VALIDATE_OUTPUT="$("${VALIDATE_CMD[@]}" 2>&1)"
+VALIDATE_STATUS=$?
+printf '%s\n' "${VALIDATE_OUTPUT}"
+if ((VALIDATE_STATUS != 0)); then
+  step_fail "${VALIDATE_STATUS}"
+  exit "${VALIDATE_STATUS}"
+fi
+
+MERGED_CONFIG_PATH="$(printf '%s\n' "${VALIDATE_OUTPUT}" | tail -n1 | tr -d '\r')"
+if [[ -z "${MERGED_CONFIG_PATH}" || ! -f "${MERGED_CONFIG_PATH}" ]]; then
+  step_fail 1
   log_error "No se pudo generar la configuracion validada."
   exit 1
 fi
+step_done
 
 ACTIVE_PROFILE="$(
 python3 - "${MERGED_CONFIG_PATH}" <<'PY'
@@ -191,53 +271,29 @@ export LOG_DIR
 export TARGET_USER
 export TARGET_HOME
 
+step_start "Preparando ejecucion de modulos"
 log_info "Perfil activo: ${ACTIVE_PROFILE}"
 log_info "Modo dry-run: ${DRY_RUN}"
-
-declare -a FINAL_MODULES=()
-for module in "${ALL_MODULES[@]}"; do
-  local_include="true"
-  if ((${#ONLY_MODULES[@]} > 0)); then
-    local_include="false"
-    for item in "${ONLY_MODULES[@]}"; do
-      if [[ "${item}" == "${module}" ]]; then
-        local_include="true"
-        break
-      fi
-    done
-  fi
-
-  if [[ "${local_include}" != "true" ]]; then
-    continue
-  fi
-
-  for item in "${SKIP_MODULES[@]}"; do
-    if [[ "${item}" == "${module}" ]]; then
-      local_include="false"
-      break
-    fi
-  done
-
-  if [[ "${local_include}" == "true" ]]; then
-    FINAL_MODULES+=("${module}")
-  fi
-done
-
 if ((${#FINAL_MODULES[@]} == 0)); then
   log_warn "No se selecciono ningun modulo para ejecutar."
+  step_done
+  step_start "Resumen final"
+  log_info "Ejecucion completada sin modulos. Revisa ${LOG_FILE} para mas detalles."
+  step_done
   exit 0
 fi
-
 log_info "Modulos a ejecutar: ${FINAL_MODULES[*]}"
+step_done
 
 for module in "${FINAL_MODULES[@]}"; do
+  step_start "Modulo ${module}"
   MODULE_SCRIPT="${REPO_ROOT}/modules/${module}/module.sh"
   if [[ ! -x "${MODULE_SCRIPT}" ]]; then
     log_error "El modulo ${module} no tiene script ejecutable en ${MODULE_SCRIPT}"
+    step_fail 1
     exit 1
   fi
 
-  log_info "Ejecutando modulo ${module}"
   MODULE_CMD=(
     "${MODULE_SCRIPT}"
     --config "${CONFIG_JSON_PATH}"
@@ -249,7 +305,18 @@ for module in "${FINAL_MODULES[@]}"; do
   if [[ "${DRY_RUN}" == "true" ]]; then
     MODULE_CMD+=(--dry-run)
   fi
-  "${MODULE_CMD[@]}"
+
+  if "${MODULE_CMD[@]}"; then
+    step_done
+  else
+    status=$?
+    step_fail "${status}"
+    exit "${status}"
+  fi
 done
 
+step_start "Resumen final"
 log_info "Ejecucion completada. Revisa ${LOG_FILE} para mas detalles."
+step_done
+
+exit 0
