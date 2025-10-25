@@ -58,6 +58,11 @@ PY
 
 install_zsh() {
   ensure_apt_packages zsh
+  if ! command_exists zsh; then
+    log_warn "zsh no esta disponible en el sistema; el modulo se omitira."
+    return 1
+  fi
+  return 0
 }
 
 set_default_shell() {
@@ -216,7 +221,7 @@ install_nerd_fonts() {
     return
   fi
 
-  ensure_apt_packages curl unzip fontconfig
+  ensure_apt_packages curl wget unzip fontconfig
 
   local fonts_dir="/usr/local/share/fonts/nerd-fonts"
 
@@ -240,7 +245,11 @@ install_nerd_fonts() {
           local encoded_variant="${variant// /%20}"
           local url="https://github.com/romkatv/powerlevel10k-media/raw/master/MesloLGS%20NF%20${encoded_variant}.ttf"
           log_info "Descargando fuente ${filename}"
-          curl -fsSL -o "${target_file}" "${url}"
+          if ! download_file "${url}" "${target_file}" "Fuente ${filename}"; then
+            log_warn "No se pudo obtener la fuente ${filename}; se omitira."
+            rm -f "${target_file}"
+            continue
+          fi
         done
         ;;
       *)
@@ -288,7 +297,18 @@ main() {
 
   load_shell_config
 
-  install_zsh
+  if ! install_zsh; then
+    log_warn "Se omite la configuracion de shell debido a la falta de zsh."
+    module_finish
+    return
+  fi
+
+  if [[ ! -x "${ZSH_PATH}" ]]; then
+    log_warn "El ejecutable ${ZSH_PATH} no existe; se omite."
+    module_finish
+    return
+  fi
+
   set_default_shell
   install_ohmyzsh
   configure_plugins
