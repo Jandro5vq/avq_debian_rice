@@ -91,6 +91,13 @@ urllib.request.urlretrieve(url, dest)
 PY
 }
 
+pip_install_module() {
+  local package="$1"
+  if ! run_cmd "Instalando modulo Python ${package}" PIP_BREAK_SYSTEM_PACKAGES=1 python3 -m pip install --upgrade --break-system-packages "${package}"; then
+    run_cmd "Instalando modulo Python ${package} (modo usuario)" python3 -m pip install --user --upgrade "${package}"
+  fi
+}
+
 ensure_python_modules() {
   local -a missing_modules=()
   local module package
@@ -122,12 +129,12 @@ ensure_python_modules() {
     local get_pip_script
     get_pip_script="$(mktemp)"
     download_get_pip "${get_pip_script}" "https://bootstrap.pypa.io/get-pip.py"
-    run_cmd "Instalando pip mediante get-pip" python3 "${get_pip_script}" --disable-pip-version-check
+    run_cmd "Instalando pip mediante get-pip" PIP_BREAK_SYSTEM_PACKAGES=1 python3 "${get_pip_script}" --disable-pip-version-check
     rm -f "${get_pip_script}"
   fi
 
   for package in "${missing_modules[@]}"; do
-    run_cmd "Instalando modulo Python ${package}" python3 -m pip install --upgrade "${package}"
+    pip_install_module "${package}"
   done
 }
 
