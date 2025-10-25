@@ -83,9 +83,18 @@ ensure_python_modules() {
     return
   fi
 
-  ensure_apt_packages python3-pip
   if ! command_exists pip3; then
-    run_cmd "Instalando pip mediante ensurepip" python3 -m ensurepip --upgrade
+    if apt_candidate_exists python3-pip; then
+      ensure_apt_packages python3-pip
+    fi
+  fi
+
+  if ! command_exists pip3; then
+    local get_pip_script
+    get_pip_script="$(mktemp)"
+    run_cmd "Descargando instalador get-pip" curl -fsSL -o "${get_pip_script}" https://bootstrap.pypa.io/get-pip.py
+    run_cmd "Instalando pip mediante get-pip" python3 "${get_pip_script}" --disable-pip-version-check
+    rm -f "${get_pip_script}"
   fi
 
   for package in "${missing_modules[@]}"; do
@@ -177,3 +186,4 @@ MERGED_CONFIG_PATH="${MERGED_CONFIG_PATH//$'\n'/}"
 
 log_info "Configuracion validada correctamente: ${MERGED_CONFIG_PATH}"
 printf '%s\n' "${MERGED_CONFIG_PATH}"
+
