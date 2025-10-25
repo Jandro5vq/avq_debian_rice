@@ -52,6 +52,14 @@ install_cursor_theme() {
 
   ensure_apt_packages bibata-cursor-theme
 
+  local cursor_dir="/usr/share/icons/${cursor_theme}"
+  local index_path="${cursor_dir}/index.theme"
+
+  if [[ ! -d "${cursor_dir}" || ! -f "${index_path}" ]]; then
+    log_warn "El cursor ${cursor_theme} no esta disponible en el sistema; se omitira."
+    return
+  fi
+
   if [[ "${DRY_RUN}" == "true" ]]; then
     log_info "(dry-run) Se configuraria update-alternatives para cursor ${cursor_theme}"
     return
@@ -65,7 +73,7 @@ install_cursor_theme() {
       run_cmd "Actualizando cursor predeterminado" update-alternatives --set x-cursor-theme "${cursor_theme}"
     fi
   else
-    run_cmd "Configurando cursor predeterminado" update-alternatives --install /usr/share/icons/default/index.theme x-cursor-theme "/usr/share/icons/${cursor_theme}/index.theme" 100
+    run_cmd "Configurando cursor predeterminado" update-alternatives --install /usr/share/icons/default/index.theme x-cursor-theme "${index_path}" 100
   fi
 }
 
@@ -126,7 +134,12 @@ configure_user_theme() {
   run_as_user "${TARGET_USER}" kwriteconfig5 --file kdeglobals --group Icons --key Theme "${icon_theme}"
   run_as_user "${TARGET_USER}" kwriteconfig5 --file kdeglobals --group KDE --key widgetStyle "kvantum"
 
-  run_as_user "${TARGET_USER}" kwriteconfig5 --file kcminputrc --group Mouse --key cursorTheme "${cursor_theme}"
+  local cursor_dir="/usr/share/icons/${cursor_theme}"
+  if [[ -d "${cursor_dir}" ]]; then
+    run_as_user "${TARGET_USER}" kwriteconfig5 --file kcminputrc --group Mouse --key cursorTheme "${cursor_theme}"
+  else
+    log_warn "No se aplicara cursor ${cursor_theme}; directorio ${cursor_dir} ausente."
+  fi
 
   if [[ "${DRY_RUN}" == "true" ]]; then
     log_info "(dry-run) Se escribiria configuracion de Kvantum en ${kvantum_cfg}"
