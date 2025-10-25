@@ -115,8 +115,6 @@ install_deb_app() {
   local name="$1"
   local download_url="$2"
 
-  ensure_apt_packages curl
-
   local work_dir
   work_dir="$(get_workdir)"
 
@@ -162,7 +160,7 @@ install_manual_app() {
         return
       fi
 
-      ensure_apt_packages curl tar
+      ensure_apt_packages tar
       local arch_label
       case "$(dpkg --print-architecture)" in
         amd64)
@@ -187,9 +185,12 @@ install_manual_app() {
         rm -rf "${work_dir}"
         return
       fi
-      curl -fsSL -o "${tarball}" "${url}"
-      tar -xf "${tarball}" -C "${work_dir}"
-      install -m 0755 "${work_dir}/lazydocker" /usr/local/bin/lazydocker
+      if download_file "${url}" "${tarball}" "lazydocker"; then
+        tar -xf "${tarball}" -C "${work_dir}"
+        install -m 0755 "${work_dir}/lazydocker" /usr/local/bin/lazydocker
+      else
+        log_warn "No se pudo obtener lazydocker desde ${url}; se omitira."
+      fi
       rm -rf "${work_dir}"
       ;;
     *)
@@ -228,7 +229,7 @@ process_app_entry() {
 
 run_post_updates() {
   if [[ "${DRY_RUN}" == "true" ]]; then
-    log_info "(dry-run) Se ejecutaria apt upgrade && flatpak update"
+    log_info "(dry-run) Se ejecutaria apt upgrade"
     return
   fi
 
@@ -245,14 +246,27 @@ main() {
 
   ensure_apt_packages curl
   ensure_flatpak_base
+  local flatpak_available="true"
+  if ! command_exists flatpak; then
+    log_warn "Flatpak no esta disponible; se omitiran remotos y aplicaciones Flatpak."
+    flatpak_available="false"
+  fi
 
   while IFS='::' read -r kind arg1 arg2 arg3 arg4; do
     case "${kind}" in
       REMOTE)
-        ensure_flatpak_remote "${arg1}" "${arg2}"
+        if [[ "${flatpak_available}" == "true" ]]; then
+          ensure_flatpak_remote "${arg1}" "${arg2}"
+        else
+          log_warn "Se omite remoto Flatpak ${arg1} por falta de soporte."
+        fi
         ;;
       APP)
-        process_app_entry "${arg1}" "${arg2}" "${arg3}" "${arg4}"
+        if [[ "${arg2}" == "flatpak" && "${flatpak_available}" != "true" ]]; then
+          log_warn "Se omite instalacion Flatpak de ${arg1} por falta de soporte."
+        else
+          process_app_entry "${arg1}" "${arg2}" "${arg3}" "${arg4}"
+        fi
         ;;
     esac
   done < <(enumerate_apps)
@@ -263,3 +277,4 @@ main() {
 }
 
 main "$@"
+
