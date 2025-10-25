@@ -196,10 +196,6 @@ download_deb_if_needed() {
     rm -f "$dest"
     return 1
   fi
-    log_error "La descarga de ${description} no produjo un .deb valido."
-    rm -f "$dest"
-    return 1
-  fi
 }
 
 install_deb_package() {
@@ -529,6 +525,7 @@ run_as_user() {
     runuser -u "$user" -- "$@"
   fi
 }
+
 
 
 
