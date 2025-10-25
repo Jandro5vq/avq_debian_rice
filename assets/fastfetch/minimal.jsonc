@@ -1,0 +1,23 @@
+{
+  "display": {
+    "separator": "  "
+  },
+  "modules": [
+    { "type": "os", "key": "Sistema" },
+    { "type": "host", "key": "Equipo" },
+    { "type": "kernel", "key": "Kernel" },
+    { "type": "packages", "key": "Paquetes" },
+    { "type": "shell", "key": "Shell" },
+    { "type": "terminal", "key": "Terminal" },
+    { "type": "theme", "key": "Tema" },
+    { "type": "wm", "key": "Compositor" },
+    { "type": "cpu", "key": "CPU" },
+    { "type": "gpu", "key": "GPU" },
+    { "type": "memory", "key": "RAM" }
+  ],
+  "logo": {
+    "type": "file",
+    "path": "/usr/share/fastfetch/ascii-avq.txt"
+  }
+}
+

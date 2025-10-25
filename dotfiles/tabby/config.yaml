@@ -1,0 +1,15 @@
+configVersion: 1
+enableAnalytics: false
+appearance:
+  theme: "Tabby Default"
+terminal:
+  shell: /usr/bin/zsh
+  font: MesloLGS NF
+  fontSize: 13
+  cursorStyle: beam
+profiles:
+  - name: Debian
+    shell: /usr/bin/zsh
+    colorScheme: "Tabby Default"
+    enableTransparency: false
+

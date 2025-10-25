@@ -1,0 +1,10 @@
+[user]
+  name = Alejandro
+  email = alejandro.v.quintano@gmail.com
+[core]
+  editor = code --wait
+[init]
+  defaultBranch = main
+[pull]
+  rebase = false
+

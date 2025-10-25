@@ -1,0 +1,291 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "meta",
+    "system",
+    "theming",
+    "terminal",
+    "shell",
+    "apps",
+    "dev",
+    "dotfiles",
+    "telemetry",
+    "github",
+    "updates"
+  ],
+  "properties": {
+    "meta": {
+      "type": "object",
+      "required": ["version", "profile", "dry_run", "non_interactive"],
+      "additionalProperties": false,
+      "properties": {
+        "version": {"type": "integer", "minimum": 1},
+        "profile": {"type": "string"},
+        "dry_run": {"type": "boolean"},
+        "non_interactive": {"type": "boolean"}
+      }
+    },
+    "system": {
+      "type": "object",
+      "required": ["enable_contrib_nonfree", "desktop_environment", "upgrade", "fonts"],
+      "additionalProperties": false,
+      "properties": {
+        "enable_contrib_nonfree": {"type": "boolean"},
+        "desktop_environment": {
+          "type": "object",
+          "required": ["plasma", "sddm"],
+          "additionalProperties": false,
+          "properties": {
+            "plasma": {"type": "boolean"},
+            "sddm": {"type": "boolean"}
+          }
+        },
+        "upgrade": {"type": "boolean"},
+        "fonts": {
+          "type": "array",
+          "items": {"type": "string"}
+        }
+      }
+    },
+    "theming": {
+      "type": "object",
+      "required": ["style", "plasma_theme", "color_scheme", "kvantum_theme", "icons", "cursor", "wallpaper"],
+      "additionalProperties": false,
+      "properties": {
+        "style": {"type": "string"},
+        "plasma_theme": {"type": "string"},
+        "color_scheme": {"type": "string"},
+        "kvantum_theme": {"type": "string"},
+        "icons": {
+          "type": "object",
+          "required": ["name", "folders_color"],
+          "additionalProperties": false,
+          "properties": {
+            "name": {"type": "string"},
+            "folders_color": {"type": "string"}
+          }
+        },
+        "cursor": {"type": "string"},
+        "wallpaper": {"type": "string"}
+      }
+    },
+    "terminal": {
+      "type": "object",
+      "required": ["default", "install"],
+      "additionalProperties": false,
+      "properties": {
+        "default": {"type": "string"},
+        "install": {
+          "type": "object",
+          "properties": {
+            "tabby": {
+              "type": "object",
+              "properties": {
+                "enabled": {"type": "boolean"},
+                "source": {"type": "string"},
+                "version": {"type": "string"},
+                "set_as_default_x_terminal": {"type": "boolean"}
+              },
+              "additionalProperties": false
+            },
+            "kitty": {
+              "type": "object",
+              "properties": {
+                "enabled": {"type": "boolean"},
+                "source": {"type": "string"},
+                "set_as_default_x_terminal": {"type": "boolean"}
+              },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": true
+        }
+      }
+    },
+    "shell": {
+      "type": "object",
+      "required": ["default", "ohmyzsh", "powerlevel10k", "nerd_fonts"],
+      "additionalProperties": false,
+      "properties": {
+        "default": {"type": "string"},
+        "ohmyzsh": {
+          "type": "object",
+          "required": ["enabled", "plugins"],
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {"type": "boolean"},
+            "plugins": {
+              "type": "array",
+              "items": {"type": "string"}
+            }
+          }
+        },
+        "powerlevel10k": {
+          "type": "object",
+          "required": ["enabled", "instant_prompt", "config"],
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {"type": "boolean"},
+            "instant_prompt": {"type": "boolean"},
+            "config": {"type": "string"}
+          }
+        },
+        "nerd_fonts": {
+          "type": "object",
+          "required": ["install", "set_for_terminals"],
+          "additionalProperties": false,
+          "properties": {
+            "install": {
+              "type": "array",
+              "items": {"type": "string"}
+            },
+            "set_for_terminals": {"type": "boolean"}
+          }
+        }
+      }
+    },
+    "apps": {
+      "type": "object",
+      "required": ["flatpak", "list"],
+      "additionalProperties": false,
+      "properties": {
+        "flatpak": {
+          "type": "object",
+          "properties": {
+            "remotes": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["name", "url"],
+                "additionalProperties": false,
+                "properties": {
+                  "name": {"type": "string"},
+                  "url": {"type": "string"}
+                }
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        "list": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name", "source"],
+            "additionalProperties": false,
+            "properties": {
+              "name": {"type": "string"},
+              "source": {"type": "string"},
+              "auto_update": {"type": "boolean"},
+              "download_url": {"type": "string"}
+            }
+          }
+        }
+      }
+    },
+    "dev": {
+      "type": "object",
+      "required": ["containers"],
+      "additionalProperties": false,
+      "properties": {
+        "containers": {
+          "type": "object",
+          "required": ["engine", "add_user_to_group", "compose_plugin"],
+          "additionalProperties": false,
+          "properties": {
+            "engine": {"type": "string"},
+            "add_user_to_group": {"type": "boolean"},
+            "compose_plugin": {"type": "boolean"}
+          }
+        }
+      }
+    },
+    "dotfiles": {
+      "type": "object",
+      "required": ["mode", "repo", "mapping"],
+      "additionalProperties": false,
+      "properties": {
+        "mode": {"type": "string"},
+        "repo": {"type": "string"},
+        "mapping": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["source", "target"],
+            "additionalProperties": false,
+            "properties": {
+              "source": {"type": "string"},
+              "target": {"type": "string"}
+            }
+          }
+        }
+      }
+    },
+    "telemetry": {
+      "type": "object",
+      "required": ["fastfetch"],
+      "additionalProperties": false,
+      "properties": {
+        "fastfetch": {
+          "type": "object",
+          "required": ["enabled", "preset", "ascii_file", "motd"],
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {"type": "boolean"},
+            "preset": {"type": "string"},
+            "ascii_file": {"type": "string"},
+            "motd": {
+              "type": "object",
+              "required": ["enabled", "position"],
+              "additionalProperties": false,
+              "properties": {
+                "enabled": {"type": "boolean"},
+                "position": {"type": "string"}
+              }
+            }
+          }
+        }
+      }
+    },
+    "github": {
+      "type": "object",
+      "required": ["configure", "user", "ssh_key", "cli"],
+      "additionalProperties": false,
+      "properties": {
+        "configure": {"type": "boolean"},
+        "user": {
+          "type": "object",
+          "required": ["name", "email"],
+          "additionalProperties": false,
+          "properties": {
+            "name": {"type": "string"},
+            "email": {"type": "string"}
+          }
+        },
+        "ssh_key": {
+          "type": "object",
+          "required": ["type", "comment", "passphrase", "add_to_agent"],
+          "additionalProperties": false,
+          "properties": {
+            "type": {"type": "string"},
+            "comment": {"type": "string"},
+            "passphrase": {"type": "string"},
+            "add_to_agent": {"type": "boolean"}
+          }
+        },
+        "cli": {"type": "object","required": ["install_gh", "auth", "upload_ssh_key"],"additionalProperties": false,"properties": {"install_gh": {"type": "boolean"},"auth": {"type": "string"},"upload_ssh_key": {"type": "boolean"},"token": {"type": "string"}}}
+      }
+    },
+    "updates": {
+      "type": "object",
+      "required": ["auto_run_at_end"],
+      "additionalProperties": false,
+      "properties": {
+        "auto_run_at_end": {"type": "boolean"}
+      }
+    }
+  }
+}
+

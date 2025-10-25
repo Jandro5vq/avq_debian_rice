@@ -1,0 +1,13 @@
+# Perfil workstation agrega herramientas graficas extra
+apps:
+  list:
+    - name: flameshot
+      source: apt
+    - name: obs-studio
+      source: apt
+terminal:
+  default: "kitty"
+  install:
+    kitty:
+      enabled: true
+      set_as_default_x_terminal: true

@@ -1,0 +1,15 @@
+# Perfil laptop ajusta optimizaciones de energia
+system:
+  fonts:
+    - fonts-inter
+    - fonts-firacode
+    - fonts-ubuntu
+    - fonts-jetbrains-mono
+apps:
+  list:
+    - name: tlp
+      source: apt
+telemetry:
+  fastfetch:
+    motd:
+      enabled: true

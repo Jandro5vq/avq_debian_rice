@@ -1,0 +1,140 @@
+meta:
+  version: 1
+  profile: laptop
+  dry_run: false
+  non_interactive: true
+
+system:
+  enable_contrib_nonfree: true
+  desktop_environment:
+    plasma: true
+    sddm: true
+  upgrade: true
+  fonts:
+    - fonts-inter
+    - fonts-firacode
+    - fonts-ubuntu
+
+theming:
+  style: "zorin-like"
+  plasma_theme: "Orchis-Dark"
+  color_scheme: "OrchisDarkBlue"
+  kvantum_theme: "Orchis"
+  icons:
+    name: "Papirus-Dark"
+    folders_color: "blue"
+  cursor: "Bibata-Modern-Classic"
+  wallpaper: "assets/wallpapers/blue-wave.jpg"
+
+terminal:
+  default: "tabby"
+  install:
+    tabby:
+      enabled: true
+      source: "deb"
+      version: "latest"
+      set_as_default_x_terminal: true
+    kitty:
+      enabled: true
+      source: "apt"
+      set_as_default_x_terminal: false
+
+shell:
+  default: "zsh"
+  ohmyzsh:
+    enabled: true
+    plugins: [git, z, docker, kubectl]
+  powerlevel10k:
+    enabled: true
+    instant_prompt: true
+    config: "assets/p10k/.p10k.zsh"
+  nerd_fonts:
+    install: ["MesloLGS NF"]
+    set_for_terminals: true
+
+apps:
+  flatpak:
+    remotes:
+      - name: flathub
+        url: "https://flathub.org/repo/flathub.flatpakrepo"
+  list:
+    - name: brave
+      source: repo
+      auto_update: true
+    - name: thunderbird
+      source: apt
+    - name: smartgit
+      source: deb
+      download_url: "https://www.syntevo.com/downloads/smartgit/smartgit-linux-amd64.deb"
+      auto_update: false
+    - name: slack
+      source: flatpak
+    - name: notepadpp
+      source: flatpak
+    - name: vscode
+      source: repo
+      auto_update: true
+    - name: spotify
+      source: flatpak
+    - name: btop
+      source: apt
+    - name: dbeaver-ce
+      source: flatpak
+    - name: lazydocker
+      source: manual
+      download_url: "https://github.com/jesseduffield/lazydocker/releases/latest/download/lazydocker_x86_64.tar.gz"
+      auto_update: false
+    - name: android-studio
+      source: flatpak
+    - name: postman
+      source: flatpak
+
+dev:
+  containers:
+    engine: "docker"
+    add_user_to_group: true
+    compose_plugin: true
+
+dotfiles:
+  mode: "direct"
+  repo: "IN-REPO"
+  mapping:
+    - source: "dotfiles/zsh/.zshrc"
+      target: "~/.zshrc"
+    - source: "dotfiles/zsh/.p10k.zsh"
+      target: "~/.p10k.zsh"
+    - source: "dotfiles/git/.gitconfig"
+      target: "~/.gitconfig"
+    - source: "dotfiles/tabby/config.yaml"
+      target: "~/.config/tabby/config.yaml"
+    - source: "dotfiles/kitty/"
+      target: "~/.config/kitty"
+    - source: "dotfiles/fastfetch/config.jsonc"
+      target: "~/.config/fastfetch/config.jsonc"
+
+telemetry:
+  fastfetch:
+    enabled: true
+    preset: "assets/fastfetch/minimal.jsonc"
+    ascii_file: "assets/fastfetch/ascii-small.txt"
+    motd:
+      enabled: true
+      position: "top"
+
+github:
+  configure: true
+  user:
+    name: "Tu Nombre"
+    email: "tu-email@dominio.com"
+  ssh_key:
+    type: "ed25519"
+    comment: "alejandro@debian"
+    passphrase: ""
+    add_to_agent: true
+  cli:
+    install_gh: true
+    auth: "web"
+    upload_ssh_key: true
+
+updates:
+  auto_run_at_end: true
