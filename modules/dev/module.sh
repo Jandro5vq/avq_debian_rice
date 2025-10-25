@@ -57,7 +57,21 @@ PY
 }
 
 setup_docker_repository() {
-  ensure_apt_packages ca-certificates curl gnupg lsb-release
+  ensure_apt_packages ca-certificates lsb-release
+  local net_tools="false"
+  if apt_candidate_exists curl; then
+    ensure_apt_packages curl
+    net_tools="true"
+  fi
+  if apt_candidate_exists gnupg; then
+    ensure_apt_packages gnupg
+    net_tools="true"
+  fi
+
+  if [[ "${net_tools}" != "true" ]]; then
+    log_warn "curl/gpg no estan disponibles en repos; se omitira la configuracion del repositorio Docker."
+    return 1
+  fi
 
   local keyring="/etc/apt/keyrings/docker.gpg"
   local repo_file="/etc/apt/sources.list.d/docker.list"
@@ -94,7 +108,10 @@ setup_docker_repository() {
 }
 
 install_docker_engine() {
-  setup_docker_repository
+  if ! setup_docker_repository; then
+    log_warn "No se pudo preparar el repositorio de Docker; se omite instalacion."
+    return
+  fi
 
   local packages=(
     docker-ce
